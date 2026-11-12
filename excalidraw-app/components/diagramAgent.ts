@@ -73,7 +73,10 @@ export async function askDiagramAgent(
   messages: LLMMessage[],
 ): Promise<TTTDDialog.OnTextSubmitRetValue> {
   try {
-    if (!messages.length || !messages.some((message) => message.content.trim())) {
+    if (
+      !messages.length ||
+      !messages.some((message) => message.content.trim())
+    ) {
       return requestError("RocketRide error: Enter a diagram request.", 400);
     }
 
@@ -101,7 +104,9 @@ export async function askDiagramAgent(
       return notRunning();
     }
 
-    const contentfulMessages = messages.filter((message) => message.content.trim());
+    const contentfulMessages = messages.filter((message) =>
+      message.content.trim(),
+    );
     const prompt =
       contentfulMessages.length === 1
         ? contentfulMessages[0].content
@@ -116,17 +121,26 @@ export async function askDiagramAgent(
     const answers: unknown = result?.answers;
 
     if (!Array.isArray(answers) || answers.length === 0) {
-      return requestError("RocketRide error: The diagram agent returned no answer.", 502);
+      return requestError(
+        "RocketRide error: The diagram agent returned no answer.",
+        502,
+      );
     }
 
     const lastAnswer: unknown = answers[answers.length - 1];
     if (typeof lastAnswer !== "string") {
-      return requestError("RocketRide error: The diagram agent returned an invalid answer.", 502);
+      return requestError(
+        "RocketRide error: The diagram agent returned an invalid answer.",
+        502,
+      );
     }
 
     const generatedResponse = stripMermaidFence(lastAnswer);
     if (!generatedResponse) {
-      return requestError("RocketRide error: The diagram agent returned an empty diagram.", 502);
+      return requestError(
+        "RocketRide error: The diagram agent returned an empty diagram.",
+        502,
+      );
     }
 
     if (/^\**LLM error\b/i.test(generatedResponse)) {

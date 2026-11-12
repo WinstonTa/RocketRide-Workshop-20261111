@@ -1,7 +1,10 @@
 import "./DiagramAgentPanel.scss";
 
 import { convertToExcalidrawElements } from "@excalidraw/excalidraw";
-import { useApp, useExcalidrawSetAppState } from "@excalidraw/excalidraw/components/App";
+import {
+  useApp,
+  useExcalidrawSetAppState,
+} from "@excalidraw/excalidraw/components/App";
 import { ChatInterface } from "@excalidraw/excalidraw/components/TTDDialog/Chat";
 import { MERMAID_TO_EXCALIDRAW_CONFIG } from "@excalidraw/excalidraw/mermaid";
 import { newElementWith } from "@excalidraw/element";
@@ -61,11 +64,10 @@ export const DiagramAgentPanel = () => {
     const { parseMermaidToExcalidraw } = await import(
       "@excalidraw/mermaid-to-excalidraw"
     );
-    const { elements: skeleton, files = {} } =
-      await parseMermaidToExcalidraw(
-        mermaid,
-        MERMAID_TO_EXCALIDRAW_CONFIG,
-      );
+    const { elements: skeleton, files = {} } = await parseMermaidToExcalidraw(
+      mermaid,
+      MERMAID_TO_EXCALIDRAW_CONFIG,
+    );
     const elements = convertToExcalidrawElements(skeleton, {
       regenerateIds: true,
       renderEnvironment: app.renderEnvironment,
@@ -202,11 +204,7 @@ export const DiagramAgentPanel = () => {
       (message) => message.id === failedAnswer.id,
     );
     const question = messages[failedIndex - 1];
-    if (
-      failedIndex < 1 ||
-      question?.type !== "user" ||
-      !question.content
-    ) {
+    if (failedIndex < 1 || question?.type !== "user" || !question.content) {
       return;
     }
 
@@ -249,20 +247,14 @@ export const DiagramAgentPanel = () => {
       return current.filter(
         (_, index) =>
           index !== assistantIndex &&
-          !(
-            index === assistantIndex - 1 &&
-            current[index].type === "user"
-          ),
+          !(index === assistantIndex - 1 && current[index].type === "user"),
       );
     });
   };
 
   const onAiRepairClick = () => {
     if (!isGenerating) {
-      void generatePrompt(
-        "That diagram has a syntax error, fix it.",
-        messages,
-      );
+      void generatePrompt("That diagram has a syntax error, fix it.", messages);
     }
   };
 

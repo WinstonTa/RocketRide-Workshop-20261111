@@ -131,7 +131,10 @@ export const AppSidebar = () => {
           </LinkButton>
         </div>
       </Sidebar.Tab>
-      <Sidebar.Tab tab="diagram-agent" style={{ padding: "0 0.75rem", minHeight: 0 }}>
+      <Sidebar.Tab
+        tab="diagram-agent"
+        style={{ padding: "0 0.75rem", minHeight: 0 }}
+      >
         <DiagramAgentPanel />
       </Sidebar.Tab>
     </DefaultSidebar>
