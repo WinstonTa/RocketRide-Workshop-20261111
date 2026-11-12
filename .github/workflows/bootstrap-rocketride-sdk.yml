@@ -1,0 +1,88 @@
+name: Pin RocketRide v1.6.0 for Excalidraw app
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/bootstrap-rocketride-sdk.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rocketride-sdk-bootstrap-main
+  cancel-in-progress: false
+
+jobs:
+  dependency:
+    name: Generate Yarn dependency lockfile and verify installed SDK
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Check main and workspace preconditions
+        id: gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          test "$(git rev-parse HEAD)" = "$(git rev-parse refs/remotes/origin/main)"
+          test -f package.json
+          test -f yarn.lock
+          test -d excalidraw-app
+          if node -e 'process.exit(require("./excalidraw-app/package.json").dependencies?.rocketride === "1.6.0" ? 0 : 1)'; then
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Node.js 22
+        if: steps.gate.outputs.needed == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Enable pinned Yarn Classic
+        if: steps.gate.outputs.needed == 'true'
+        shell: bash
+        run: |
+          corepack enable
+          corepack prepare yarn@1.22.22 --activate
+          yarn --version
+
+      - name: Add SDK and generate Yarn lockfile
+        if: steps.gate.outputs.needed == 'true'
+        shell: bash
+        run: |
+          yarn workspace excalidraw-app add rocketride@1.6.0 --exact --non-interactive --ignore-scripts
+
+      - name: Verify installed SDK declarations
+        if: steps.gate.outputs.needed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync("node_modules/rocketride/package.json","utf8"));if(p.version!=="1.6.0")process.exit(1);console.log("Installed rocketride",p.version)'
+          grep -Rql 'getTaskToken' node_modules/rocketride/dist/types/client
+          grep -Rql 'getTaskStatus' node_modules/rocketride/dist/types/client
+          node -e 'if(require("./excalidraw-app/package.json").dependencies.rocketride!=="1.6.0")process.exit(1)'
+
+      - name: Commit and push isolated dependency snapshot
+        if: steps.gate.outputs.needed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add excalidraw-app/package.json yarn.lock
+          git diff --cached --check
+          test "$(git diff --cached --name-only | sort)" = "$(printf '%s\n' excalidraw-app/package.json yarn.lock | sort)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore/dependencies: pin RocketRide TypeScript SDK 1.6.0"
+          git push origin HEAD:refs/heads/main
+          git fetch origin main
+          test "$(git rev-parse HEAD)" = "$(git rev-parse refs/remotes/origin/main)"
