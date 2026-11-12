@@ -1,0 +1,8 @@
+.excalidraw .default-sidebar .sidebar-triggers {
+  .sidebar-tab-trigger[id$="-trigger-search"] {
+    order: -2;
+  }
+  .sidebar-tab-trigger[id$="-trigger-diagram-agent"] {
+    order: -1;
+  }
+}
