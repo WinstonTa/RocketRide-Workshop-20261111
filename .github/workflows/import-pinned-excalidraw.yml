@@ -1,0 +1,47 @@
+name: Import pinned Excalidraw source at RocketRide workshop root
+
+# This is a one-time, owner-approved repository migration. The import script
+# checks the exact gitlink SHA and remote HEAD before touching the Git index.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/import-pinned-excalidraw.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rocketride-excalidraw-root-import
+  cancel-in-progress: false
+
+jobs:
+  import:
+    name: Import upstream source, preserve ancestry, push a reviewed snapshot
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout workshop main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Check whether the import is already complete
+        id: gate
+        shell: bash
+        run: |
+          if test -f package.json && test -f yarn.lock && test -d excalidraw-app; then
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+            echo "Excalidraw root import already present; skipping."
+          else
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Import pinned upstream and verify remote main
+        if: steps.gate.outputs.needed == 'true'
+        shell: bash
+        run: bash scripts/import_pinned_excalidraw.sh
