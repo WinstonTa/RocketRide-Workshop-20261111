@@ -101,11 +101,11 @@ jobs:
             echo "Yarn: $(yarn --version || true)"
             echo
             if test -f "$result"; then
-              echo "Command: `yarn build:app`"
+              echo "Command: yarn build:app"
               echo "Exit: $(cat "$result")"
               echo
               echo '~~~text'
-              tail -55 "$log" | sed -E 's/(API_KEY|TOKEN|SECRET|PASSWORD)=([^[:space:]]+)/\1=[REDACTED]/Ig'
+              tail -22 "$log" | sed -E 's/(API_KEY|TOKEN|SECRET|PASSWORD)=([^[:space:]]+)/\1=[REDACTED]/Ig'
               echo '~~~'
             else
               echo 'Build command not reached; inspect run prerequisite failure.'
