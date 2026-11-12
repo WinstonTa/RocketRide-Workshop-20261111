@@ -1,0 +1,127 @@
+name: Build RocketRide Excalidraw app
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/build-rocketride-excalidraw.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rocketride-excalidraw-build-main
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Verify source topology, pipeline JSON and Vite build
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - name: Checkout workshop main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install locked workspace dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack prepare yarn@1.22.22 --activate
+          yarn install --frozen-lockfile --non-interactive --ignore-scripts
+
+      - name: Check workshop source topology, pipeline links, and forbidden edits
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f package.json
+          test -f yarn.lock
+          test -d excalidraw-app
+          test -d packages/excalidraw
+          test -f LICENSE
+          test -f pipelines/diagram-agent.pipe
+          test -f excalidraw-app/components/diagramAgent.ts
+          test -f excalidraw-app/components/DiagramAgentPanel.tsx
+          test -f excalidraw-app/components/DiagramAgentPanel.scss
+          test -f excalidraw-app/components/AppSidebar.tsx
+          test ! -e excalidraw
+          git ls-files pipelines/diagram-agent.pipe | grep -qx 'pipelines/diagram-agent.pipe'
+          node - <<'NODE'
+          const fs = require('fs');
+          const assert = require('assert/strict');
+          const root = JSON.parse(fs.readFileSync('pipelines/diagram-agent.pipe','utf8'));
+          assert.equal(root.name, 'Excalidraw diagram agent');
+          assert.equal(root.project_id, 'dafb1567-0f6e-4b87-a00e-74ce8bef1db7');
+          assert.equal(root.source, 'webhook_1');
+          for(const id of ['webhook_1','question_1','agent_rocketride_1','llm_anthropic_1','memory_internal_1','tool_http_request_1','response_answers_1']){
+            assert(root.components.some(c=>c.id===id),id+' missing');
+          }
+          const tool=root.components.find(c=>c.id==='tool_http_request_1');
+          assert(tool.config.allowPOST===false && tool.config.allowPUT===false && tool.config.allowPATCH===false && tool.config.allowDELETE===false);
+          assert.equal(tool.config.urlWhitelist[0].whitelistPattern, '^https://raw[.]githubusercontent[.]com/');
+          const llm=root.components.find(c=>c.id==='llm_anthropic_1');
+          assert.equal(llm.config['claude-sonnet-4-6'].apikey, '$'+'{ROCKETRIDE_ANTHROPIC_KEY}');
+          console.log('Root source and pipeline structural checks passed');
+          NODE
+
+      - name: Compile production Vite application
+        shell: bash
+        run: |
+          set +e
+          mkdir -p "$RUNNER_TEMP/rocketride-build"
+          yarn build:app > "$RUNNER_TEMP/rocketride-build/build.log" 2>&1
+          echo "$?" > "$RUNNER_TEMP/rocketride-build/build.exit"
+          echo "Vite exit: $(cat "$RUNNER_TEMP/rocketride-build/build.exit")"
+          tail -30 "$RUNNER_TEMP/rocketride-build/build.log"
+
+      - name: Commit nonsecret build evidence
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p docs
+          log="$RUNNER_TEMP/rocketride-build/build.log"
+          result="$RUNNER_TEMP/rocketride-build/build.exit"
+          {
+            echo '# Diagram agent — production Vite build'
+            echo
+            echo "Run: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "Commit tested: $GITHUB_SHA"
+            echo
+            echo "Node: $(node --version)"
+            echo "Yarn: $(yarn --version || true)"
+            echo
+            if test -f "$result"; then
+              echo "Command: `yarn build:app`"
+              echo "Exit: $(cat "$result")"
+              echo
+              echo '~~~text'
+              tail -55 "$log" | sed -E 's/(API_KEY|TOKEN|SECRET|PASSWORD)=([^[:space:]]+)/\1=[REDACTED]/Ig'
+              echo '~~~'
+            else
+              echo 'Build command not reached; inspect run prerequisite failure.'
+            fi
+          } > docs/DIAGRAM_AGENT_BUILD.md
+          git add docs/DIAGRAM_AGENT_BUILD.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if ! git diff --cached --quiet; then
+            git commit -m "test/build: record Excalidraw production bundle check"
+            git push origin HEAD:refs/heads/main
+          fi
+
+      - name: Enforce successful Vite bundle
+        if: always()
+        shell: bash
+        run: |
+          test -f "$RUNNER_TEMP/rocketride-build/build.exit"
+          test "$(cat "$RUNNER_TEMP/rocketride-build/build.exit")" = 0
