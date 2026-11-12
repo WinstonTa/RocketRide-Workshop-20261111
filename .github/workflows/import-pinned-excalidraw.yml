@@ -1,5 +1,6 @@
 name: Import pinned Excalidraw source at RocketRide workshop root
 
+# Retry after verified pre-merge Git identity fix; still one-time and owner-approved.
 # This is a one-time, owner-approved repository migration. The import script
 # checks the exact gitlink SHA and remote HEAD before touching the Git index.
 on:

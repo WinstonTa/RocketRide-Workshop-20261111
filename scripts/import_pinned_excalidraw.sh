@@ -52,6 +52,9 @@ test ! -e "$staging/.github/workflows/import-pinned-excalidraw.yml"
 
 PHASE="merge upstream commit ancestry"
 echo "Recording upstream ancestry without rewriting workshop history"
+# Git needs the bot identity for preparing a merge even with --no-commit.
+git config user.name "github-actions[bot]"
+git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 git merge --allow-unrelated-histories --no-ff --no-commit -s ours "$PINNED"
 
 PHASE="import source and remove gitlink"
