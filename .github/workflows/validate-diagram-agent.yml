@@ -1,0 +1,118 @@
+name: Validate RocketRide diagram agent integration
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/validate-diagram-agent.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rocketride-diagram-validation-main
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Format, typecheck and lint the five-file workshop integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Setup Node and Yarn
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install pinned dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack prepare yarn@1.22.22 --activate
+          yarn install --frozen-lockfile --non-interactive --ignore-scripts
+
+      - name: Format only the specified app files
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx prettier --write \
+            excalidraw-app/components/diagramAgent.ts \
+            excalidraw-app/components/DiagramAgentPanel.tsx \
+            excalidraw-app/components/AppSidebar.tsx \
+            excalidraw-app/components/DiagramAgentPanel.scss
+          git add \
+            excalidraw-app/components/diagramAgent.ts \
+            excalidraw-app/components/DiagramAgentPanel.tsx \
+            excalidraw-app/components/AppSidebar.tsx \
+            excalidraw-app/components/DiagramAgentPanel.scss
+          git diff --cached --check
+          if ! git diff --cached --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "chore/format: normalize RocketRide agent app files"
+            git push origin HEAD:refs/heads/main
+          fi
+
+      - name: Run reproducible validation checks
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/diagram-agent-validation"
+          set +e
+          npx prettier --check \
+            excalidraw-app/components/diagramAgent.ts \
+            excalidraw-app/components/DiagramAgentPanel.tsx \
+            excalidraw-app/components/AppSidebar.tsx \
+            excalidraw-app/components/DiagramAgentPanel.scss \
+            > "$RUNNER_TEMP/diagram-agent-validation/prettier.txt" 2>&1
+          echo "$?" > "$RUNNER_TEMP/diagram-agent-validation/prettier.status"
+          npx tsc -p tsconfig.json --noEmit \
+            > "$RUNNER_TEMP/diagram-agent-validation/tsc.txt" 2>&1
+          echo "$?" > "$RUNNER_TEMP/diagram-agent-validation/tsc.status"
+          npx eslint --max-warnings=0 \
+            excalidraw-app/components/diagramAgent.ts \
+            excalidraw-app/components/DiagramAgentPanel.tsx \
+            excalidraw-app/components/AppSidebar.tsx \
+            > "$RUNNER_TEMP/diagram-agent-validation/eslint.txt" 2>&1
+          echo "$?" > "$RUNNER_TEMP/diagram-agent-validation/eslint.status"
+          exit 0
+
+      - name: Commit verification evidence and report failure if needed
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/diagram-agent-validation"
+          {
+            echo "# Diagram agent validation — GitHub Actions"
+            echo
+            echo "Run: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "Revision tested: $(git rev-parse HEAD)"
+            echo "SDK: rocketride 1.6.0"
+            echo "Node: $(node --version)"
+            echo "Yarn: $(yarn --version)"
+            echo
+            for cmd in prettier tsc eslint; do
+              code="$(cat "$dir/$cmd.status")"
+              echo "## $cmd (exit $code)"
+              echo
+              echo '~~~text'
+              head -90 "$dir/$cmd.txt"
+              echo '~~~'
+              echo
+            done
+          } > docs/DIAGRAM_AGENT_VALIDATION.md
+          git add docs/DIAGRAM_AGENT_VALIDATION.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "test/diagram-agent: record formatter typecheck and lint results"
+          git push origin HEAD:refs/heads/main
+          for cmd in prettier tsc eslint; do
+            test "$(cat "$dir/$cmd.status")" = 0 || exit 1
+          done
