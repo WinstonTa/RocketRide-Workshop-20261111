@@ -1,5 +1,6 @@
 import { DefaultSidebar, Sidebar, THEME } from "@excalidraw/excalidraw";
 import {
+  brainIconThin,
   messageCircleIcon,
   presentationIcon,
 } from "@excalidraw/excalidraw/components/icons";
@@ -7,6 +8,7 @@ import { LinkButton } from "@excalidraw/excalidraw/components/LinkButton";
 import { useUIAppState } from "@excalidraw/excalidraw/context/ui-appState";
 
 import "./AppSidebar.scss";
+import { DiagramAgentPanel } from "./DiagramAgentPanel";
 
 type SidebarPromoCopyProps = {
   text: string;
@@ -71,6 +73,9 @@ export const AppSidebar = () => {
   return (
     <DefaultSidebar>
       <DefaultSidebar.TabTriggers>
+        <Sidebar.TabTrigger tab="diagram-agent" title="Diagram agent">
+          {brainIconThin}
+        </Sidebar.TabTrigger>
         <Sidebar.TabTrigger
           tab="comments"
           style={{ opacity: openSidebar?.tab === "comments" ? 1 : 0.4 }}
@@ -125,6 +130,9 @@ export const AppSidebar = () => {
             Sign up now
           </LinkButton>
         </div>
+      </Sidebar.Tab>
+      <Sidebar.Tab tab="diagram-agent" style={{ padding: "0 0.75rem", minHeight: 0 }}>
+        <DiagramAgentPanel />
       </Sidebar.Tab>
     </DefaultSidebar>
   );
