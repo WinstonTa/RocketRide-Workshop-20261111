@@ -112,7 +112,7 @@ export async function askDiagramAgent(
         ? contentfulMessages[0].content
         : [
             ...contentfulMessages.map(
-              (message) => message.role + ": " + message.content,
+              (message) => `${message.role}: ${message.content}`,
             ),
             "Answer the last user message.",
           ].join("\n");
@@ -144,7 +144,7 @@ export async function askDiagramAgent(
     }
 
     if (/^\**LLM error\b/i.test(generatedResponse)) {
-      return requestError("RocketRide error: " + generatedResponse, 502);
+      return requestError(`RocketRide error: ${generatedResponse}`, 502);
     }
 
     return { generatedResponse, error: null };
@@ -153,6 +153,6 @@ export async function askDiagramAgent(
     if (details.toLowerCase().includes("not running")) {
       return notRunning();
     }
-    return requestError("RocketRide error: " + details);
+    return requestError(`RocketRide error: ${details}`);
   }
 }

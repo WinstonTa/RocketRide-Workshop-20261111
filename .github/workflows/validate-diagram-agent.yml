@@ -1,4 +1,5 @@
 name: Validate RocketRide diagram agent integration
+# Repeat after the first ESLint diagnostics; keep source-only fixes reviewable.
 
 on:
   push:

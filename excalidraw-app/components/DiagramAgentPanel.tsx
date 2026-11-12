@@ -1,5 +1,3 @@
-import "./DiagramAgentPanel.scss";
-
 import { convertToExcalidrawElements } from "@excalidraw/excalidraw";
 import {
   useApp,
@@ -9,15 +7,17 @@ import { ChatInterface } from "@excalidraw/excalidraw/components/TTDDialog/Chat"
 import { MERMAID_TO_EXCALIDRAW_CONFIG } from "@excalidraw/excalidraw/mermaid";
 import { newElementWith } from "@excalidraw/element";
 
-import { atom, useAtom } from "../app-jotai";
-
-import { askDiagramAgent } from "./diagramAgent";
-
 import type {
   LLMMessage,
   TChat,
   TTTDDialog,
 } from "@excalidraw/excalidraw/components/TTDDialog/types";
+
+import { atom, useAtom } from "../app-jotai";
+
+import { askDiagramAgent } from "./diagramAgent";
+
+import "./DiagramAgentPanel.scss";
 
 const diagramMessagesAtom = atom<TChat.ChatMessage[]>([]);
 const diagramPromptAtom = atom("");
