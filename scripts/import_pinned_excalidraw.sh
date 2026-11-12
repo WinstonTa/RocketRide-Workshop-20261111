@@ -2,6 +2,8 @@
 # One-time, pinned, non-force-pushing Excalidraw root import.
 # Run only from the approved workshop repository's clean main checkout.
 set -Eeuo pipefail
+PHASE="initial preflight"
+trap 'code=$?; printf "phase=%s\nline=%s\nexit=%s\n" "$PHASE" "$LINENO" "$code" > "${RUNNER_TEMP:-/tmp}/rocketride-import-failure.txt"; echo "Root import failed in phase: $PHASE, line $LINENO, exit $code" >&2' ERR
 
 PINNED="701b901a0f1ba3d0b390d9cdf63d112e25abac4b"
 UPSTREAM_URL="https://github.com/excalidraw/excalidraw.git"
@@ -21,6 +23,7 @@ test -f pipelines/diagram-agent.pipe
 test -f scripts/import_pinned_excalidraw.sh
 test -f .github/workflows/import-pinned-excalidraw.yml
 
+PHASE="fetch upstream git history"
 echo "Fetching pinned upstream Excalidraw commit with its history"
 if git remote get-url rocketride-upstream >/dev/null 2>&1; then
   test "$(git remote get-url rocketride-upstream)" = "$UPSTREAM_URL"
@@ -33,6 +36,7 @@ git fetch --no-tags rocketride-upstream "$PINNED"
 git cat-file -e "$PINNED^{commit}"
 git cat-file -e "$PINNED^{tree}"
 
+PHASE="extract upstream snapshot"
 staging="$(mktemp -d)"
 trap 'rm -rf "$staging"' EXIT
 git archive "$PINNED" | tar -xf - -C "$staging"
@@ -46,9 +50,11 @@ test ! -e "$staging/pipelines/diagram-agent.pipe"
 test ! -e "$staging/scripts/import_pinned_excalidraw.sh"
 test ! -e "$staging/.github/workflows/import-pinned-excalidraw.yml"
 
+PHASE="merge upstream commit ancestry"
 echo "Recording upstream ancestry without rewriting workshop history"
 git merge --allow-unrelated-histories --no-ff --no-commit -s ours "$PINNED"
 
+PHASE="import source and remove gitlink"
 echo "Replacing the tracked gitlink with the pinned source snapshot"
 git rm -- excalidraw
 if test -d excalidraw; then
@@ -64,6 +70,7 @@ rsync -a --exclude='/.gitignore' --exclude='/.github/workflows/' "$staging/" ./
   printf '\n# RocketRide workshop secrets and local state\n.rocketride/\n.env\n'
 } > .gitignore
 
+PHASE="validate imported source files"
 echo "Checking required source paths, pipeline, and upstream license"
 test -f package.json
 test -f yarn.lock
@@ -78,6 +85,7 @@ python3 -m json.tool pipelines/diagram-agent.pipe >/dev/null
 python3 -m json.tool package.json >/dev/null
 python3 -m json.tool excalidraw-app/package.json >/dev/null
 
+PHASE="stage and check Git diff"
 git add -A
 test -z "$(git ls-files -- excalidraw)"
 if git diff --cached --name-only | grep -Eq '^(pipelines/|\.env$|\.rocketride/)'; then
@@ -92,6 +100,7 @@ if ! git diff --cached --check; then
   echo "WARNING: upstream snapshot has whitespace warnings; inspect pinned source before attributing to workshop changes." >&2
 fi
 
+PHASE="commit Git merge"
 git config user.name "github-actions[bot]"
 git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 git commit -m "chore/repository: import pinned Excalidraw source at workshop root" \
@@ -99,6 +108,7 @@ git commit -m "chore/repository: import pinned Excalidraw source at workshop roo
 echo "New merge commit parents: $(git rev-list --parents -n 1 HEAD)"
 test "$(git rev-list --parents -n 1 HEAD | awk '{print $3}')" = "$PINNED"
 
+PHASE="push and verify remote main"
 echo "Pushing commit to main without force (a concurrent update will reject)"
 git push origin HEAD:refs/heads/main
 pushed="$(git ls-remote origin refs/heads/main | awk '{print $1}')"

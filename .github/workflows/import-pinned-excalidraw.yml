@@ -45,3 +45,38 @@ jobs:
         if: steps.gate.outputs.needed == 'true'
         shell: bash
         run: bash scripts/import_pinned_excalidraw.sh
+
+      - name: Record minimal failed-import diagnostics in the workshop repository
+        if: failure() && steps.gate.outputs.needed == 'true'
+        shell: bash
+        run: |
+          # This runner checkout is disposable. Never modify remote history or
+          # retry a failed migration by force-pushing.
+          git fetch origin main
+          if test "$(git rev-parse refs/remotes/origin/main)" != "$GITHUB_SHA"; then
+            echo "Remote main advanced; refusing a diagnostic commit."
+            exit 0
+          fi
+          git merge --abort 2>/dev/null || true
+          git reset --hard refs/remotes/origin/main
+          git clean -fd
+          mkdir -p docs
+          {
+            echo "# Pinned Excalidraw root import — failed CI attempt"
+            echo
+            echo "GitHub run: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "Original main: $GITHUB_SHA"
+            echo "No source import or force push occurred."
+            echo
+            echo '## Failure checkpoint'
+            if test -f "$RUNNER_TEMP/rocketride-import-failure.txt"; then
+              cat "$RUNNER_TEMP/rocketride-import-failure.txt"
+            else
+              echo "No script trap report generated (error occurred outside script or before trap)."
+            fi
+          } > docs/IMPORT_DIAGNOSTICS.md
+          git add docs/IMPORT_DIAGNOSTICS.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "docs/repository: capture root import failure checkpoint"
+          git push origin HEAD:refs/heads/main
